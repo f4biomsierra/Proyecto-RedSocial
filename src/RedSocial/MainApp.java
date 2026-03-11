@@ -376,7 +376,7 @@ public class MainApp extends JFrame {
     private JPanel construirPlaceholder(String nombre) {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(BLANCO);
-        JLabel lbl = new JLabel("aaaaaaaaa");
+        JLabel lbl = new JLabel(nombre);
         lbl.setFont(FONT_BOLD);
         lbl.setForeground(Color.GRAY);
         panel.add(lbl);
