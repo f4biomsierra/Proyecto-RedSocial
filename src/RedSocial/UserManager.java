@@ -41,7 +41,7 @@ public class UserManager {
     }
     
     private void initStickersGlobales(){
-        String[] stickers = {"Feliz", "Triste", "Corazon", "Risa", "Enojado"};
+        String[] stickers = {"Feliz", "Triste", "Corazon", "Risa", "Aplauso"};
         for(String sticker : stickers){
             File stFile = new File("INSTA_RAIZ/stickers_globales/" + sticker + ".stk");
             if(!stFile.exists()){
@@ -55,7 +55,7 @@ public class UserManager {
     }
     
     public boolean crearUser(String username, String nombreCompleto, Genero genero, String password, int edad, File fotoPerfil, TipoCuenta tipoCuenta) throws IOException{
-        if(buscarporUsername(username)!=null)
+        if(buscarporUsername(username) != null)
             return false;
         
         User user = new User(username.toLowerCase(), nombreCompleto, genero, password, edad, fotoPerfil, tipoCuenta);
@@ -101,9 +101,10 @@ public class UserManager {
         RandomAccessFile archivoUsuarios = new RandomAccessFile("INSTA_RAIZ/users.ins", "r");
         while(archivoUsuarios.getFilePointer() < archivoUsuarios.length()){
             User user = leerUsuario(archivoUsuarios);
-            if(user.getUsername().equalsIgnoreCase(username))
+            if(user.getUsername().equalsIgnoreCase(username)){
                 archivoUsuarios.close();
-                return user;
+                return user;  // ← ahora ambas líneas están dentro del if
+            }
         }
         archivoUsuarios.close();
         return null;
@@ -115,7 +116,7 @@ public class UserManager {
         RandomAccessFile archivoUsuarios = new RandomAccessFile("INSTA_RAIZ/users.ins", "r");
         while(archivoUsuarios.getFilePointer() < archivoUsuarios.length()){
             User user = leerUsuario(archivoUsuarios);
-            if(user.isEstadoCuenta() && user.getUsername().toLowerCase().contains(consulta) || user.getNombreCompleto().toLowerCase().contains(consulta)){
+            if(user.isEstadoCuenta() && (user.getUsername().toLowerCase().contains(consulta) || user.getNombreCompleto().toLowerCase().contains(consulta))){
                 resultados.add(user);
             }
         }

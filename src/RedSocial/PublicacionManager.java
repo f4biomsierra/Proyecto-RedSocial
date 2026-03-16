@@ -44,13 +44,16 @@ public class PublicacionManager {
     
     public List<Publicacion> obtenerPublicaciones(String username) throws IOException{
         List<Publicacion> lista = new ArrayList<>();
+        // Verificar que el archivo existe antes de abrirlo
+        File f = new File(raiz + "/" + username.toLowerCase() + "/insta.ins");
+        if(!f.exists() || f.length() == 0) return lista;
         RandomAccessFile rInsta = abrirInsta(username);
         rInsta.seek(0);
         while(rInsta.getFilePointer() < rInsta.length()){
             lista.add(leerPublicacion(rInsta));
         }
         rInsta.close();
-        lista.sort((a, b) -> Long.compare(b.getFecha(), a.getFecha()));
+        ordenarPorFecha(lista);
         return lista;
     }
     
@@ -63,34 +66,83 @@ public class PublicacionManager {
                 feed.addAll(obtenerPublicaciones(u));
             }
         }
-        feed.sort((a, b) -> Long.compare(b.getFecha(), a.getFecha()));
+        ordenarPorFecha(feed);
         return feed;
+    }
+    
+    public void buscarPorHashtagRecursivo(String hashtag, List<User> usuarios, int indice, List<Publicacion> resultados) throws IOException{
+        if(indice >= usuarios.size()) return;
+        User user = usuarios.get(indice);
+        if(user.isEstadoCuenta()){
+            for(Publicacion p : obtenerPublicaciones(user.getUsername()))
+                if(p.contieneHashtag(hashtag)) resultados.add(p);
+        }
+        buscarPorHashtagRecursivo(hashtag, usuarios, indice + 1, resultados);
     }
     
     public List<Publicacion> buscarPorHashtag(String hashtag, List<User> todosUsuarios) throws IOException{
         List<Publicacion> resultados = new ArrayList<>();
-        for(User u : todosUsuarios){
-            if(!u.isEstadoCuenta()) continue;
-            for(Publicacion p : obtenerPublicaciones(u.getUsername())){
-                if(p.contieneHashtag(hashtag))
-                    resultados.add(p);
-            }
-        }
+        buscarPorHashtagRecursivo(hashtag, todosUsuarios, 0, resultados);
         return resultados;
+    }
+    
+    public void buscarMencionesRecursivo(String username, List<User> usuarios, int indice, List<Publicacion> resultados) throws IOException{
+        if(indice >= usuarios.size()) return;
+        User user = usuarios.get(indice);
+        if(user.isEstadoCuenta()){
+            for(Publicacion p : obtenerPublicaciones(user.getUsername()))
+                if(p.mencionUsuario(username)) resultados.add(p);
+        }
+        buscarMencionesRecursivo(username, usuarios, indice + 1, resultados);
     }
     
     public List<Publicacion> buscarMenciones(String username, List<User> todosUsuarios) throws IOException{
         List<Publicacion> resultados = new ArrayList<>();
-        for(User u : todosUsuarios){
-            if(!u.isEstadoCuenta()) continue;
-            for(Publicacion p : obtenerPublicaciones(u.getUsername())){
-                if(p.mencionUsuario(username))
-                    resultados.add(p);
-            }
-        }
+        buscarMencionesRecursivo(username, todosUsuarios, 0, resultados);
         return resultados;
     }
     
+    // Ordenamiento burbuja descendente (más reciente primero)
+    // contador2 empieza en contador1+1 para no comparar elementos ya procesados
+    // comparación < para ordenar de mayor a menor fecha
+    private void ordenarPorFecha(List<Publicacion> lista){
+        for(int contador1 = 0; contador1 < lista.size() - 1; contador1++){
+            for(int contador2 = contador1 + 1; contador2 < lista.size(); contador2++){
+                if(lista.get(contador1).getFecha() < lista.get(contador2).getFecha()){
+                    Publicacion temp = lista.get(contador1);
+                    lista.set(contador1, lista.get(contador2));
+                    lista.set(contador2, temp);
+                }
+            }
+        }
+    }
+    
+    public void darLike(String usernameAutor, long fechaHora) throws IOException {
+        cambiarLike(usernameAutor, fechaHora, +1);
+    }
+
+    public void quitarLike(String usernameAutor, long fechaHora) throws IOException {
+        cambiarLike(usernameAutor, fechaHora, -1);
+    }
+
+    private void cambiarLike(String usernameAutor, long fechaHora, int delta) throws IOException {
+        List<Publicacion> lista = obtenerPublicaciones(usernameAutor);
+        boolean cambio = false;
+        for (Publicacion p : lista) {
+            if (p.getFecha() == fechaHora) {
+                int nuevo = p.getLikes() + delta;
+                p.setLikes(nuevo < 0 ? 0 : nuevo);
+                cambio = true;
+                break;
+            }
+        }
+        if (!cambio) return;
+        RandomAccessFile rf = abrirInsta(usernameAutor);
+        rf.setLength(0);
+        for (Publicacion p : lista) escribirPublicacion(rf, p);
+        rf.close();
+    }
+
     private RandomAccessFile abrirInsta(String username) throws IOException{
         return new RandomAccessFile(raiz + "/" + username.toLowerCase() + "/insta.ins", "rw");
     }

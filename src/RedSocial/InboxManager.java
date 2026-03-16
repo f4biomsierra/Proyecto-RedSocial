@@ -66,17 +66,19 @@ public class InboxManager {
                 conv.add(inbox);
             }
         }
-        
-        for(int indice=0; indice < conv.size() - 1; indice++){
-            for(int indice2=indice+1; indice2 < conv.size(); indice2++){
-                if(conv.get(indice).getFechaHora() > conv.get(indice2).getFechaHora()){
-                    Inbox temp = conv.get(indice);
-                    conv.set(indice, conv.get(indice2));
-                    conv.set(indice2, temp);
-                }
-            }
-        }
+        ordenarPorFecha(conv);
         return conv;
+    }
+    
+    public int contarNoLeidosRecursivo(List<Inbox> mensajes, String username, int indice){
+        if(indice >= mensajes.size()) return 0;
+        Inbox in = mensajes.get(indice);
+        int NoLeido = (in.getReceptor().equalsIgnoreCase(username) && !in.isLeido()) ? 1 : 0;
+        return NoLeido + contarNoLeidosRecursivo(mensajes, username, indice + 1);
+    }
+    
+    public int contarNoLeidos(String username) throws IOException{
+        return contarNoLeidosRecursivo(obtenerTodosMensajes(username), username, 0);
     }
     
     public List<Inbox> obtenerTodosMensajes(String username) throws IOException{
@@ -90,14 +92,6 @@ public class InboxManager {
         }
         rafObj.close();
         return lista;
-    }
-    
-    public int contarNoLeidos(String username) throws IOException{
-        int contador = 0;
-        for(Inbox inbox : obtenerTodosMensajes(username)){
-            if(inbox.getReceptor().equalsIgnoreCase(username) && !inbox.isLeido()) contador++;
-        }
-        return contador;
     }
     
     public void marcarLeidos(String yo, String otro) throws IOException{
@@ -114,9 +108,13 @@ public class InboxManager {
     
     public void eliminarConversacion(String yo, String otro) throws IOException{
         List<Inbox> todos = obtenerTodosMensajes(yo);
-        todos.removeIf(inbox ->
-            (inbox.getEmisor().equalsIgnoreCase(yo) && inbox.getReceptor().equalsIgnoreCase(otro)) || (inbox.getEmisor().equalsIgnoreCase(otro) && inbox.getReceptor().equalsIgnoreCase(otro)));
-        reescribirInbox(yo, todos);
+        List<Inbox> filtrada = new ArrayList<>();
+        for(Inbox in : todos){
+            boolean esConv =
+                    (in.getEmisor().equalsIgnoreCase(yo) && in.getReceptor().equalsIgnoreCase(otro)) || (in.getEmisor().equalsIgnoreCase(otro) && in.getReceptor().equalsIgnoreCase(yo));
+            if(!esConv) filtrada.add(in);
+        }
+        reescribirInbox(yo, filtrada);
     }
     
     private void reescribirInbox(String username, List<Inbox> mensajes) throws IOException{
@@ -124,6 +122,18 @@ public class InboxManager {
         rInbox.setLength(0);
         for(Inbox inbox : mensajes) escribirMensaje(rInbox, inbox);
         rInbox.close();
+    }
+    
+    private void ordenarPorFecha(List<Inbox> lista){
+        for(int contador1=0; contador1<lista.size() - 1; contador1++){
+            for(int contador2=contador1 + 1; contador2<lista.size(); contador2++){
+                if(lista.get(contador1).getFechaHora() > lista.get(contador2).getFechaHora()){
+                    Inbox temp = lista.get(contador1);
+                    lista.set(contador1, lista.get(contador2));
+                    lista.set(contador2, temp);
+                }
+            }
+        }
     }
     
     private String archivoInbox(String username){
