@@ -10,36 +10,38 @@ import java.util.*;
  *
  * @author Fabio Sierra
  */
+
 public class StickerManager {
-    private final String carRaiz = "INSTA_RAIZ";
-    
-    public StickerManager(){
-        crearStickerGlobales();
+
+    private final String raiz = "insta_raiz";
+
+    public StickerManager() {
+        crearStickersGlobales();
     }
-    
-    private void crearStickerGlobales(){
-        File dir = new File(carRaiz + "/sticker_globales");
+
+    private void crearStickersGlobales() {
+        File dir = new File(raiz + "/stickers_globales");
         dir.mkdirs();
         String[] nombres = {"Feliz", "Triste", "Corazon", "Risa", "Aplauso"};
-        for(String n : nombres){
-            File f = new File(carRaiz + "/stickers_globales/" + n + ".stk");
-            if(!f.exists()) try { f.createNewFile(); } catch (IOException e) {}
+        for (String n : nombres) {
+            File f = new File(raiz + "/stickers_globales/" + n + ".stk");
+            if (!f.exists()) try { f.createNewFile(); } catch (IOException e) {}
         }
     }
-    
-    public List<String> obtenerStickersGlobales(){
+
+    public List<String> obtenerStickersGlobales() {
         List<String> lista = new ArrayList<>();
-        File dir = new File(carRaiz + "/stickers_globales");
+        File dir = new File(raiz + "/stickers_globales");
         File[] archivos = dir.listFiles((d, name) -> name.endsWith(".stk"));
-        if(archivos != null)
-            for(File f : archivos)
+        if (archivos != null)
+            for (File f : archivos)
                 lista.add(f.getName().replace(".stk", ""));
         return lista;
     }
-    
+
     public List<String> obtenerStickersPersonales(String username) throws IOException {
         List<String> lista = new ArrayList<>();
-        File f = new File(carRaiz + "/" + username + "/stickers.ins");
+        File f = new File(raiz + "/" + username + "/stickers.ins");
         if (!f.exists() || f.length() == 0) return lista;
         RandomAccessFile rf = new RandomAccessFile(f, "r");
         while (rf.getFilePointer() < rf.length()) lista.add(rf.readUTF());
@@ -55,11 +57,12 @@ public class StickerManager {
 
     public void importarSticker(String username, String nombreSticker) throws IOException {
         RandomAccessFile rf = new RandomAccessFile(
-            carRaiz + "/" + username + "/stickers.ins", "rw");
+            raiz + "/" + username + "/stickers.ins", "rw");
         rf.seek(rf.length());
         rf.writeUTF(nombreSticker);
         rf.close();
-        new File(carRaiz + "/" + username + "/stickers_personales/" + nombreSticker + ".stk")
-            .createNewFile();
+        File dirPersonal = new File(raiz + "/" + username + "/stickers_personales");
+        dirPersonal.mkdirs();
+        new File(dirPersonal, nombreSticker + ".stk").createNewFile();
     }
 }
