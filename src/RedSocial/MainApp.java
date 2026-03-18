@@ -16,36 +16,36 @@ import java.util.List;
 
 public class MainApp extends JFrame {
 
-    private final UserManager userManager = new UserManager();
-    private final PublicacionManager pubManager = new PublicacionManager();
-    private final FollowManager followManager = new FollowManager();
-    private final InboxManager inboxManager = new InboxManager();
-    private final StickerManager stickerManager = new StickerManager();
-    private final ComentarioManager comentarioManager = new ComentarioManager();
+    private final UserManager        userManager        = new UserManager();
+    private final PublicacionManager pubManager         = new PublicacionManager();
+    private final FollowManager      followManager      = new FollowManager();
+    private final InboxManager       inboxManager       = new InboxManager();
+    private final StickerManager     stickerManager     = new StickerManager();
+    private final ComentarioManager  comentarioManager  = new ComentarioManager();
 
     private final InboxServer mensajeServer = new InboxServer();
 
     private Runnable recargarConversacionActual = null;
-    private String conversacionAbieraCon = null;
+    private String   conversacionAbieraCon      = null;
 
     private User usuarioActual = null;
     private JPanel headerHome = null;
     private String vistaAnterior = "FEED";
     private final java.util.Set<String> likesEnSesion = new java.util.HashSet<>();
 
-    private static final Color BLANCO = Color.WHITE;
-    private static final Color NEGRO = new Color(30, 30, 30);
+    private static final Color BLANCO     = Color.WHITE;
+    private static final Color NEGRO      = new Color(30, 30, 30);
     private static final Color GRIS_CLARO = new Color(250, 250, 250);
     private static final Color GRIS_BORDE = new Color(219, 219, 219);
-    private static final Color AZUL_IG = new Color(0, 149, 246);
-    private static final Color ROSA_IG = new Color(225, 48, 108);
-    private static final Font FONT_BOLD = new Font("SansSerif", Font.BOLD, 13);
-    private static final Font FONT_NORM = new Font("SansSerif", Font.PLAIN, 12);
-    private static final Font FONT_SMALL = new Font("SansSerif", Font.PLAIN, 10);
-    private static final Font FONT_LOGO = new Font("Serif", Font.ITALIC, 26);
+    private static final Color AZUL_IG    = new Color(0, 149, 246);
+    private static final Color ROSA_IG    = new Color(225, 48, 108);
+    private static final Font  FONT_BOLD  = new Font("SansSerif", Font.BOLD,   13);
+    private static final Font  FONT_NORM  = new Font("SansSerif", Font.PLAIN,  12);
+    private static final Font  FONT_SMALL = new Font("SansSerif", Font.PLAIN,  10);
+    private static final Font  FONT_LOGO  = new Font("Serif",     Font.ITALIC, 26);
 
     private final CardLayout cardLayout = new CardLayout();
-    private final JPanel mainPanel = new JPanel(cardLayout);
+    private final JPanel     mainPanel  = new JPanel(cardLayout);
 
     public MainApp() {
         setTitle("Instagram");
@@ -66,11 +66,33 @@ public class MainApp extends JFrame {
         mensajeServer.iniciar();
 
         mensajeServer.setListener((emisor, receptor, contenido, tipo) -> {
-            if (usuarioActual != null &&
-                receptor.equalsIgnoreCase(usuarioActual.getUsername()) &&
-                emisor.equalsIgnoreCase(conversacionAbieraCon) &&
-                recargarConversacionActual != null) {
-                recargarConversacionActual.run();
+            if (usuarioActual == null) return;
+            // Si el receptor soy yo y tengo el chat abierto con el emisor → recargar mensajes
+            if (receptor.equalsIgnoreCase(usuarioActual.getUsername())) {
+                if (emisor.equalsIgnoreCase(conversacionAbieraCon)
+                        && recargarConversacionActual != null) {
+                    SwingUtilities.invokeLater(() -> recargarConversacionActual.run());
+                    // Marcar como leídos y notificar al emisor
+                    try {
+                        inboxManager.marcarLeidos(usuarioActual.getUsername(), emisor);
+                        mensajeServer.enviarLeido(usuarioActual.getUsername(), emisor);
+                    } catch (IOException ex) {}
+                }
+                // Reconstruir inbox para actualizar badges
+                SwingUtilities.invokeLater(() -> {
+                    homeCenter.remove(getComponentByName("INBOX"));
+                    homeCenter.add(construirInbox(), "INBOX");
+                });
+            }
+        });
+
+        mensajeServer.setLeidoListener((lector, dueno) -> {
+            if (usuarioActual == null) return;
+            // El otro leyó mis mensajes → recargar para mostrar ✓✓ Visto
+            if (dueno.equalsIgnoreCase(usuarioActual.getUsername())
+                    && lector.equalsIgnoreCase(conversacionAbieraCon)
+                    && recargarConversacionActual != null) {
+                SwingUtilities.invokeLater(() -> recargarConversacionActual.run());
             }
         });
 
@@ -1243,49 +1265,66 @@ public class MainApp extends JFrame {
     }
 
     private JPanel filaConversacion(String otroUsername) {
-        JPanel fila = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        JPanel fila = new JPanel(new BorderLayout(12, 0));
         fila.setBackground(BLANCO);
         fila.setBorder(new MatteBorder(0, 0, 1, 0, GRIS_BORDE));
         fila.setMaximumSize(new Dimension(390, 65));
+        fila.setBorder(new EmptyBorder(8, 12, 8, 12));
 
         try {
             User otro = userManager.buscarporUsername(otroUsername);
-            fila.add(avatarCircular(otro != null ? otro.getFotoPerfil() : null, 46));
-        } catch (IOException ex) { fila.add(avatarCircular(null, 46)); }
+            fila.add(avatarCircular(otro != null ? otro.getFotoPerfil() : null, 46), BorderLayout.WEST);
+        } catch (IOException ex) { fila.add(avatarCircular(null, 46), BorderLayout.WEST); }
 
-        JPanel info = new JPanel();
-        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
+        JPanel info = new JPanel(new BorderLayout());
         info.setBackground(BLANCO);
+
         JLabel lblUser = new JLabel("@" + otroUsername);
         lblUser.setFont(FONT_BOLD);
-        info.add(lblUser);
+        info.add(lblUser, BorderLayout.NORTH);
 
-        try {
+        // Badge de no leídos — punto azul como Instagram
+        JLabel badge = new JLabel();
+        badge.setFont(new Font("SansSerif", Font.BOLD, 10));
+        badge.setForeground(AZUL_IG);
+        info.add(badge, BorderLayout.CENTER);
 
-            List<Inbox> todos = inboxManager.obtenerTodosMensajes(usuarioActual.getUsername());
-            int noLeidos = inboxManager.contarNoLeidosRecursivo(todos, usuarioActual.getUsername(), 0);
-
-            int noLeidosEste = 0;
-            for (Inbox inbox : todos) {
-                if (inbox.getEmisor().equalsIgnoreCase(otroUsername) &&
-                    inbox.getReceptor().equalsIgnoreCase(usuarioActual.getUsername()) &&
-                    !inbox.isLeido()) {
-                    noLeidosEste++;
+        // Helper para contar y actualizar el badge instantáneamente
+        Runnable actualizarBadge = () -> {
+            try {
+                List<Inbox> todos = inboxManager.obtenerTodosMensajes(usuarioActual.getUsername());
+                int count = 0;
+                for (Inbox msg : todos) {
+                    if (msg.getEmisor().equalsIgnoreCase(otroUsername) &&
+                        msg.getReceptor().equalsIgnoreCase(usuarioActual.getUsername()) &&
+                        !msg.isLeido()) count++;
                 }
-            }
-            if (noLeidosEste > 0) {
-                JLabel badge = new JLabel(" " + noLeidosEste + " nuevo(s)");
-                badge.setFont(FONT_SMALL);
-                badge.setForeground(AZUL_IG);
-                info.add(badge);
-            }
-        } catch (IOException e) {}
+                final int c = count;
+                SwingUtilities.invokeLater(() -> {
+                    if (c > 0) {
+                        badge.setText("● " + c + " mensaje(s) nuevo(s)");
+                        lblUser.setFont(new Font("SansSerif", Font.BOLD, 13));
+                    } else {
+                        badge.setText("");
+                        lblUser.setFont(FONT_BOLD);
+                    }
+                });
+            } catch (IOException ex) {}
+        };
+        actualizarBadge.run();
 
-        fila.add(info);
+        fila.add(info, BorderLayout.CENTER);
         fila.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         fila.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { abrirConversacion(otroUsername); }
+            public void mouseClicked(MouseEvent e) {
+                abrirConversacion(otroUsername);
+                // Marcar como leídos y actualizar badge inmediatamente
+                try { inboxManager.marcarLeidos(usuarioActual.getUsername(), otroUsername); }
+                catch (IOException ex) {}
+                actualizarBadge.run();
+            }
         });
+
         return fila;
     }
 
@@ -1687,8 +1726,11 @@ public class MainApp extends JFrame {
                 showError("Este perfil es privado. Solo puedes enviarle mensajes si lo sigues."); return;
             }
             inboxManager.marcarLeidos(usuarioActual.getUsername(), otroUsername);
+            mensajeServer.enviarLeido(usuarioActual.getUsername(), otroUsername);
 
         } catch (IOException e) { showError(e.getMessage()); return; }
+        homeCenter.remove(getComponentByName("INBOX"));
+        homeCenter.add(construirInbox(), "INBOX");
 
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(BLANCO);
@@ -2023,17 +2065,20 @@ public class MainApp extends JFrame {
     }
 
     private JPanel burbujaMensaje(Inbox m, boolean soyYo) {
-
-        JPanel fila = new JPanel(new FlowLayout(soyYo ? FlowLayout.RIGHT : FlowLayout.LEFT, 8, 3));
+        JPanel fila = new JPanel(new BorderLayout(0, 1));
         fila.setBackground(BLANCO);
+        fila.setBorder(new EmptyBorder(2, 10, 2, 10));
+
+        JPanel content = new JPanel(new FlowLayout(soyYo ? FlowLayout.RIGHT : FlowLayout.LEFT, 8, 3));
+        content.setBackground(BLANCO);
 
         if (!soyYo) {
             try {
                 User emisorUser = userManager.buscarporUsername(m.getEmisor());
-                fila.add(avatarCircular(
+                content.add(avatarCircular(
                     emisorUser != null ? emisorUser.getFotoPerfil() : null, 26));
             } catch (IOException ex) {
-                fila.add(avatarCircular(null, 26));
+                content.add(avatarCircular(null, 26));
             }
         }
 
@@ -2048,11 +2093,11 @@ public class MainApp extends JFrame {
                 Image scaled = raw.getImage().getScaledInstance(targetW, targetH, Image.SCALE_SMOOTH);
                 JLabel imgLbl = new JLabel(new ImageIcon(scaled));
                 imgLbl.setBorder(new EmptyBorder(4, 4, 4, 4));
-                fila.add(imgLbl);
+                content.add(imgLbl);
             } else {
                 JLabel lbl = new JLabel("🖼 " + m.getContenido());
                 lbl.setFont(FONT_NORM);
-                fila.add(lbl);
+                content.add(lbl);
             }
         } else if (m.getTipo().equals("STICKER")) {
             String nombre = m.getContenido();
@@ -2064,11 +2109,11 @@ public class MainApp extends JFrame {
             if (imgSticker != null) {
                 ImageIcon raw = new ImageIcon(imgSticker.getAbsolutePath());
                 Image scaled = raw.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
-                fila.add(new JLabel(new ImageIcon(scaled)));
+                content.add(new JLabel(new ImageIcon(scaled)));
             } else {
                 JLabel lbl = new JLabel("🎭 " + nombre);
                 lbl.setFont(FONT_NORM);
-                fila.add(lbl);
+                content.add(lbl);
             }
         } else {
             final Color bgColor = soyYo ? AZUL_IG : new Color(240, 240, 240);
@@ -2098,8 +2143,22 @@ public class MainApp extends JFrame {
             wrap.setBackground(BLANCO);
             wrap.setMaximumSize(new Dimension(290, 999));
             wrap.add(burbuja);
-            fila.add(wrap);
+            content.add(wrap);
         }
+        fila.add(content, BorderLayout.CENTER);
+
+        // Indicador de leído debajo del mensaje (solo en mensajes propios)
+        if (soyYo) {
+            JPanel estadoRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+            estadoRow.setBackground(BLANCO);
+            JLabel lblEstado = new JLabel(m.isLeido() ? "✓✓ Visto" : "✓ Enviado");
+            lblEstado.setFont(new Font("SansSerif", Font.PLAIN, 9));
+            lblEstado.setForeground(m.isLeido() ? AZUL_IG : Color.GRAY);
+            estadoRow.add(lblEstado);
+            fila.add(estadoRow, m.getTipo().equals("IMAGEN") || m.getTipo().equals("STICKER")
+                ? BorderLayout.SOUTH : BorderLayout.SOUTH);
+        }
+
         return fila;
     }
 

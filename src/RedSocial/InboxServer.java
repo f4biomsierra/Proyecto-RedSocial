@@ -11,25 +11,35 @@ import java.io.*;
  *
  * @author Fabio Sierra
  */
+
 public class InboxServer {
+
     private static final int PUERTO = 9090;
- 
+
     private boolean esSvidor = false;
     private ServerSocket serverSocket = null;
     private Socket socketConexion = null;
     private PrintWriter salida = null;
- 
-    // Listener que avisa a la GUI cuando llega un mensaje nuevo
+
     private MensajeListener listener = null;
- 
+    private LeidoListener leidoListener = null;
+
     public interface MensajeListener {
         void onMensajeRecibido(String emisor, String receptor, String contenido, String tipo);
     }
- 
+
+    public interface LeidoListener {
+        void onMensajesLeidos(String lector, String dueno);
+    }
+
     public void setListener(MensajeListener listener) {
         this.listener = listener;
     }
- 
+
+    public void setLeidoListener(LeidoListener l) {
+        this.leidoListener = l;
+    }
+
     /**
      * Intenta arrancar como servidor.
      * Si el puerto ya está ocupado (otra instancia corriendo), arranca como cliente.
@@ -48,7 +58,7 @@ public class InboxServer {
             iniciarHiloCliente();
         }
     }
- 
+
     /**
      * Espera en un hilo aparte a que el cliente se conecte.
      * Una vez conectado, escucha mensajes entrantes.
@@ -68,7 +78,7 @@ public class InboxServer {
         hiloServidor.setDaemon(true); // muere cuando la app cierra
         hiloServidor.start();
     }
- 
+
     /**
      * Intenta conectarse al servidor con reintentos cada 2 segundos.
      * Una vez conectado, escucha mensajes entrantes.
@@ -92,11 +102,7 @@ public class InboxServer {
         hiloCliente.setDaemon(true);
         hiloCliente.start();
     }
- 
-    /**
-     * Escucha en un hilo aparte los mensajes que llegan por Socket.
-     * Cuando llega uno, parsea el formato y avisa al listener de la GUI.
-     */
+
     private void escucharMensajes(Socket socket) {
         Thread hiloEscucha = new Thread(() -> {
             try {
@@ -114,44 +120,45 @@ public class InboxServer {
         hiloEscucha.setDaemon(true);
         hiloEscucha.start();
     }
- 
-    /**
-     * Parsea el formato "MENSAJE|emisor|receptor|contenido|tipo"
-     * y llama al listener de la GUI en el hilo de Swing (EDT).
-     */
+
     private void parsearYNotificar(String linea) {
-        // Formato esperado: MENSAJE|emisor|receptor|contenido|tipo
+        if (linea.startsWith("LEIDO|")) {
+            String[] partes = linea.split("\\|", 3);
+            if (partes.length < 3) return;
+            String lector = partes[1];
+            String dueno  = partes[2];
+            if (leidoListener != null)
+                javax.swing.SwingUtilities.invokeLater(() ->
+                    leidoListener.onMensajesLeidos(lector, dueno));
+            return;
+        }
         if (!linea.startsWith("MENSAJE|")) return;
         String[] partes = linea.split("\\|", 5);
         if (partes.length < 5) return;
- 
         String emisor    = partes[1];
         String receptor  = partes[2];
         String contenido = partes[3];
         String tipo      = partes[4];
- 
-        // Notificamos en el hilo de Swing para poder actualizar la GUI
-        if (listener != null) {
+        if (listener != null)
             javax.swing.SwingUtilities.invokeLater(() ->
                 listener.onMensajeRecibido(emisor, receptor, contenido, tipo));
-        }
     }
- 
+
     /**
      * Envía la notificación de mensaje nuevo a la otra instancia por Socket.
      * Se llama después de guardar el mensaje en el archivo .ins.
      */
     public void enviarNotificacion(String emisor, String receptor,
                                     String contenido, String tipo) {
-        if (salida == null) {
-            System.out.println("[Socket] Sin conexión, no se pudo notificar.");
-            return;
-        }
-        String mensaje = "MENSAJE|" + emisor + "|" + receptor + "|" + contenido + "|" + tipo;
-        salida.println(mensaje); // envía la línea al otro lado
-        System.out.println("[Socket] Enviado: " + mensaje);
+        if (salida == null) return;
+        salida.println("MENSAJE|" + emisor + "|" + receptor + "|" + contenido + "|" + tipo);
     }
- 
+
+    public void enviarLeido(String lector, String dueno) {
+        if (salida == null) return;
+        salida.println("LEIDO|" + lector + "|" + dueno);
+    }
+
     public void cerrar() {
         try {
             if (socketConexion != null) socketConexion.close();
@@ -160,11 +167,11 @@ public class InboxServer {
             System.out.println("[Socket] Error al cerrar: " + e.getMessage());
         }
     }
- 
+
     public boolean estaConectado() {
         return socketConexion != null && socketConexion.isConnected();
     }
- 
+
     public boolean esServidor() {
         return esSvidor;
     }

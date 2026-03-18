@@ -10,6 +10,12 @@ import java.util.*;
  *
  * @author Fabio Sierra
  */
+import java.io.*;
+import java.util.*;
+/**
+ *
+ * @author Fabio Sierra
+ */
 public class InboxManager {
     private final String carRaiz = "INSTA_RAIZ";
     
@@ -95,15 +101,29 @@ public class InboxManager {
     }
     
     public void marcarLeidos(String yo, String otro) throws IOException{
-        List<Inbox> todos = obtenerTodosMensajes(yo);
-        boolean cambio = false;
-        for(Inbox inbox : todos){
+        // Marcar en el archivo del receptor (yo)
+        List<Inbox> todosYo = obtenerTodosMensajes(yo);
+        boolean cambioYo = false;
+        for(Inbox inbox : todosYo){
             if(inbox.getEmisor().equalsIgnoreCase(otro) && inbox.getReceptor().equalsIgnoreCase(yo) && !inbox.isLeido()){
                 inbox.setLeido(true);
-                cambio=true;
+                cambioYo = true;
             }
         }
-        if(cambio) reescribirInbox(yo, todos);
+        if(cambioYo) reescribirInbox(yo, todosYo);
+
+        // Marcar tambien en el archivo del emisor (otro) para que vea "Visto"
+        File arOtro = new File(archivoInbox(otro));
+        if(!arOtro.exists()) return;
+        List<Inbox> todosOtro = obtenerTodosMensajes(otro);
+        boolean cambioOtro = false;
+        for(Inbox inbox : todosOtro){
+            if(inbox.getEmisor().equalsIgnoreCase(otro) && inbox.getReceptor().equalsIgnoreCase(yo) && !inbox.isLeido()){
+                inbox.setLeido(true);
+                cambioOtro = true;
+            }
+        }
+        if(cambioOtro) reescribirInbox(otro, todosOtro);
     }
     
     public void eliminarConversacion(String yo, String otro) throws IOException{
@@ -124,6 +144,7 @@ public class InboxManager {
         rInbox.close();
     }
     
+    // contador2 empieza en contador1+1 para no comparar elementos ya procesados
     private void ordenarPorFecha(List<Inbox> lista){
         for(int contador1=0; contador1<lista.size() - 1; contador1++){
             for(int contador2=contador1 + 1; contador2<lista.size(); contador2++){
