@@ -15,37 +15,36 @@ import java.util.*;
 import java.util.List;
 
 public class MainApp extends JFrame {
-
-    private final UserManager        userManager        = new UserManager();
-    private final PublicacionManager pubManager         = new PublicacionManager();
-    private final FollowManager      followManager      = new FollowManager();
-    private final InboxManager       inboxManager       = new InboxManager();
-    private final StickerManager     stickerManager     = new StickerManager();
-    private final ComentarioManager  comentarioManager  = new ComentarioManager();
+    private final UserManager userManager = new UserManager();
+    private final PublicacionManager pubManager = new PublicacionManager();
+    private final FollowManager followManager = new FollowManager();
+    private final InboxManager inboxManager = new InboxManager();
+    private final StickerManager stickerManager = new StickerManager();
+    private final ComentarioManager comentarioManager = new ComentarioManager();
 
     private final InboxServer mensajeServer = new InboxServer();
 
     private Runnable recargarConversacionActual = null;
-    private String   conversacionAbieraCon      = null;
+    private String conversacionAbieraCon = null;
 
     private User usuarioActual = null;
     private JPanel headerHome = null;
     private String vistaAnterior = "FEED";
     private final java.util.Set<String> likesEnSesion = new java.util.HashSet<>();
 
-    private static final Color BLANCO     = Color.WHITE;
-    private static final Color NEGRO      = new Color(30, 30, 30);
+    private static final Color BLANCO = Color.WHITE;
+    private static final Color NEGRO = new Color(30, 30, 30);
     private static final Color GRIS_CLARO = new Color(250, 250, 250);
     private static final Color GRIS_BORDE = new Color(219, 219, 219);
-    private static final Color AZUL_IG    = new Color(0, 149, 246);
-    private static final Color ROSA_IG    = new Color(225, 48, 108);
-    private static final Font  FONT_BOLD  = new Font("SansSerif", Font.BOLD,   13);
-    private static final Font  FONT_NORM  = new Font("SansSerif", Font.PLAIN,  12);
-    private static final Font  FONT_SMALL = new Font("SansSerif", Font.PLAIN,  10);
-    private static final Font  FONT_LOGO  = new Font("Serif",     Font.ITALIC, 26);
+    private static final Color AZUL_IG = new Color(0, 149, 246);
+    private static final Color ROSA_IG = new Color(225, 48, 108);
+    private static final Font FONT_BOLD = new Font("SansSerif", Font.BOLD, 13);
+    private static final Font FONT_NORM = new Font("SansSerif", Font.PLAIN, 12);
+    private static final Font FONT_SMALL = new Font("SansSerif", Font.PLAIN, 10);
+    private static final Font FONT_LOGO = new Font("Serif", Font.ITALIC, 26);
 
     private final CardLayout cardLayout = new CardLayout();
-    private final JPanel     mainPanel  = new JPanel(cardLayout);
+    private final JPanel mainPanel = new JPanel(cardLayout);
 
     public MainApp() {
         setTitle("Instagram");
